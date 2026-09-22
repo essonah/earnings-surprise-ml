@@ -31,6 +31,13 @@ Run the notebooks in order from the `notebooks/` directory:
 | `01_data_collection.ipynb` | Earnings labels (Alpha Vantage) + daily prices (Yahoo Finance) |
 | `news_collection.ipynb` | Pre-earnings news headlines (Finnhub) |
 | `02_feature_engineering.ipynb` | Technical indicators for the 14 trading days before each event |
+| `src/features.py` | Merge technical + FinBERT sentiment into `master_features.csv` |
+
+After Colab produces `data/processed/features_news_sentiment.csv`, run:
+
+```bash
+python src/features.py
+```
 
 ## Outputs
 
@@ -40,6 +47,8 @@ Generated data is gitignored and written under `data/`:
 - `data/raw/ticker_prices/` — per-ticker OHLCV history
 - `data/raw_news_for_colab.csv` — news text for NLP features
 - `data/processed/features_technical.csv` — modeling table with technical features
+- `data/processed/features_news_sentiment.csv` — FinBERT sentiment from Colab
+- `data/processed/master_features.csv` — merged training dataset
 
 ## Project layout
 
