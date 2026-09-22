@@ -1,9 +1,32 @@
+# Data (regenerate via notebooks)
 data/raw/
 data/processed/
+data/*.csv
+
+# Models & artifacts
 models/
-__pycache__/
 *.pkl
 *.pt
+
+# Secrets
 .env
-.DS_Store
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Jupyter
 .ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# OS & editors
+.DS_Store
+.idea/
+.vscode/
+.claude/
