@@ -9,6 +9,11 @@ TECHNICAL_CSV = PROCESSED_DIR / "features_technical.csv"
 SENTIMENT_CSV = PROCESSED_DIR / "features_news_sentiment.csv"
 MASTER_CSV = PROCESSED_DIR / "master_features.csv"
 
+# Train/test cutoff used everywhere a script needs a chronological split —
+# matches notebooks/algorithmic_model.ipynb, which is what the reported
+# model metrics are evaluated against.
+SPLIT_DATE = pd.Timestamp("2025-07-01")
+
 METADATA_COLS = [
     "ticker",
     "earnings_date",
