@@ -1,9 +1,10 @@
 """Poster figure: random forest feature importances on the training split."""
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.patches import FancyBboxPatch
 from sklearn.ensemble import RandomForestClassifier
 
-from utils import MASTER_CSV, METADATA_COLS
+from utils import MASTER_CSV, METADATA_COLS, SPLIT_DATE
 
 BLUE = "#2a78d6"  # categorical slot 1 — single series, no identity contrast needed
 SURFACE = "#fcfcfb"
@@ -14,7 +15,6 @@ GRIDLINE = "#e1e0d9"
 BASELINE = "#c3c2b7"
 
 RANDOM_STATE = 42
-TEST_FRACTION = 0.2
 
 LABELS = {
     "macd_hist_at_T1": "MACD histogram",
@@ -36,18 +36,17 @@ def compute_importances():
     feature_cols = [c for c in df.columns if c not in METADATA_COLS]
     X, y = df[feature_cols], df["target_label"]
 
-    cutoff = df["earnings_date"].quantile(1 - TEST_FRACTION)
-    train_mask = df["earnings_date"] <= cutoff
+    train_mask = df["earnings_date"] < SPLIT_DATE
     X_train, y_train = X[train_mask], y[train_mask]
 
     rf = RandomForestClassifier(n_estimators=300, class_weight="balanced", random_state=RANDOM_STATE)
     rf.fit(X_train, y_train)
     imp = pd.Series(rf.feature_importances_, index=feature_cols).sort_values(ascending=True)
-    return imp
+    return imp, len(X_train)
 
 
 def main():
-    imp = compute_importances()
+    imp, n_train = compute_importances()
     n = len(imp)
     names = [LABELS.get(c, c) for c in imp.index]
     values = imp.values
@@ -106,7 +105,7 @@ def main():
               fontsize=14, color=INK_PRIMARY, fontweight="bold", va="top")
     cursor += TITLE_GAP
     fig.text(0.03, y_at(cursor),
-              "Random forest feature importances, trained on the 929-event training split · "
+              f"Random forest feature importances, trained on the {n_train:,}-event training split · "
               "no single feature dominates — signal is spread across technical + sentiment features",
               fontsize=9, color=INK_MUTED, va="top", wrap=True)
 
