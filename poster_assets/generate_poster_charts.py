@@ -29,7 +29,7 @@ from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
 )
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 
 # ── Palette (validated defaults — dataviz skill, references/palette.md) ──────
@@ -145,15 +145,17 @@ savefig(fig, "03_events_over_time.png")
 feature_cols = [
     "rsi_14_at_T1", "macd_hist_at_T1", "px_vs_sma20_T1", "px_vs_sma10_T1",
     "ret_14d", "rsi_mean", "rsi_slope", "vol_mean", "vol_ratio_mean",
-    "ret_std_14d", "finbert_avg_sentiment", "target_label",
+    "ret_std_14d", "finbert_avg_sentiment",
+    "avg_surprise_pct_last4", "beat_rate_last4", "surprise_pct_last_q", "beat_streak",
+    "target_label",
 ]
 corr = df[feature_cols].corr()
 div_cmap = sns.blend_palette([DIV_RED, DIV_MID, DIV_BLUE], as_cmap=True)
 
-fig, ax = plt.subplots(figsize=(9, 7.5))
+fig, ax = plt.subplots(figsize=(11, 9))
 sns.heatmap(corr, annot=True, fmt=".2f", cmap=div_cmap, center=0, vmin=-1, vmax=1,
             square=True, linewidths=1, linecolor=SURFACE, cbar_kws={"shrink": 0.8},
-            ax=ax, annot_kws={"fontsize": 8.5})
+            ax=ax, annot_kws={"fontsize": 7.5})
 ax.set_title("Feature Correlation Matrix", fontsize=14, pad=14)
 ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=9)
 ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right", fontsize=9)
@@ -200,19 +202,23 @@ price_features = [
     "rsi_mean", "rsi_slope", "vol_mean", "vol_ratio_mean", "ret_std_14d",
 ]
 text_features = ["finbert_avg_sentiment"]
-multimodal_features = price_features + text_features
+surprise_features = ["avg_surprise_pct_last4", "beat_rate_last4", "surprise_pct_last_q", "beat_streak"]
+multimodal_features = price_features + text_features + surprise_features
 
 y_train = train_df["target_label"]
 y_test = test_df["target_label"]
 
 scaler = StandardScaler()
+scaler_surprise = StandardScaler()
 X_train_price = scaler.fit_transform(train_df[price_features])
 X_train_text = train_df[text_features].values
-X_train_multi = np.hstack((X_train_price, X_train_text))
+X_train_surprise = scaler_surprise.fit_transform(train_df[surprise_features])
+X_train_multi = np.hstack((X_train_price, X_train_text, X_train_surprise))
 
 X_test_price = scaler.transform(test_df[price_features])
 X_test_text = test_df[text_features].values
-X_test_multi = np.hstack((X_test_price, X_test_text))
+X_test_surprise = scaler_surprise.transform(test_df[surprise_features])
+X_test_multi = np.hstack((X_test_price, X_test_text, X_test_surprise))
 
 X_train_multi_df = pd.DataFrame(X_train_multi, columns=multimodal_features)
 X_test_multi_df = pd.DataFrame(X_test_multi, columns=multimodal_features)
@@ -225,19 +231,25 @@ param_grid = {
     "max_features": ["sqrt", "log2"],
 }
 
+# train_df's rows are grouped in contiguous per-ticker blocks, not interleaved,
+# so plain cv=5 (StratifiedKFold(shuffle=False)) would build folds from
+# whichever tickers land in that slice of the array rather than a fair
+# cross-section of all tickers. Shuffle explicitly to mix tickers per fold.
+cv_strategy = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
 print("Training Model A (price-only)...")
 gs_price = GridSearchCV(RandomForestClassifier(random_state=42, n_jobs=-1, class_weight="balanced"),
-                         param_grid, cv=5, scoring="roc_auc", n_jobs=-1)
+                         param_grid, cv=cv_strategy, scoring="roc_auc", n_jobs=-1)
 gs_price.fit(X_train_price, y_train)
 
 print("Training Model B (text-only)...")
 gs_text = GridSearchCV(RandomForestClassifier(random_state=42, n_jobs=-1, class_weight="balanced"),
-                        param_grid, cv=5, scoring="roc_auc", n_jobs=-1)
+                        param_grid, cv=cv_strategy, scoring="roc_auc", n_jobs=-1)
 gs_text.fit(X_train_text, y_train)
 
 print("Training Model C (multimodal)...")
 gs_multi = GridSearchCV(RandomForestClassifier(random_state=42, n_jobs=-1, class_weight="balanced"),
-                         param_grid, cv=5, scoring="roc_auc", n_jobs=-1)
+                         param_grid, cv=cv_strategy, scoring="roc_auc", n_jobs=-1)
 gs_multi.fit(X_train_multi_df, y_train)
 
 models = {
@@ -320,7 +332,7 @@ class1_shap = shap_values[:, :, 1] if isinstance(shap_values, np.ndarray) and sh
 )
 mean_abs = pd.Series(np.abs(class1_shap).mean(axis=0), index=multimodal_features).sort_values()
 
-fig, ax = plt.subplots(figsize=(8, 6))
+fig, ax = plt.subplots(figsize=(8, 7.5))
 bars = ax.barh(mean_abs.index, mean_abs.values, color=SEQ_BLUE, zorder=3, height=0.65)
 for bar, v in zip(bars, mean_abs.values):
     ax.text(bar.get_width() + mean_abs.max() * 0.01, bar.get_y() + bar.get_height() / 2,
