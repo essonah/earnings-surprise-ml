@@ -3,9 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.patches import FancyBboxPatch
 
-from utils import MASTER_CSV
-
-TEST_FRACTION = 0.2
+from utils import MASTER_CSV, SPLIT_DATE
 
 # Reference palette (dataviz skill) — light mode, status pair
 GOOD = "#0ca30c"    # beat
@@ -22,8 +20,7 @@ GAP = 6  # counts, i.e. the "surface gap" between stacked segments
 
 def load_splits():
     df = pd.read_csv(MASTER_CSV, parse_dates=["earnings_date"]).sort_values("earnings_date")
-    cutoff = df["earnings_date"].quantile(1 - TEST_FRACTION)
-    train_mask = df["earnings_date"] <= cutoff
+    train_mask = df["earnings_date"] < SPLIT_DATE
     train, test = df[train_mask], df[~train_mask]
 
     rows = []
